@@ -2,36 +2,488 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Exoplanet Classifier</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planet Classification Predictor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .prediction-card {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .history-item:hover {
+            background-color: rgba(99, 102, 241, 0.1);
+        }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Exoplanet Classifier</h1>
-        <form method="POST">
-            <div class="grid">
-                <label>Orbital Period</label><input type="number" step="any" name="orb_period" required>
-                <label>Transit Duration</label><input type="number" step="any" name="tran_dur" required>
-                <label>Transit Depth</label><input type="number" step="any" name="tran_depth" required>
-                <label>Planet Radius</label><input type="number" step="any" name="planet_radius" required>
-                <label>Equilibrium Temp</label><input type="number" step="any" name="eq_temp" required>
-                <label>Insolation Flux</label><input type="number" step="any" name="insol_flux" required>
-                <label>Stellar Teff</label><input type="number" step="any" name="stellar_teff" required>
-                <label>Stellar logg</label><input type="number" step="any" name="stellar_logg" required>
-                <label>Stellar Radius</label><input type="number" step="any" name="stellar_rad" required>
-                <label>RA</label><input type="number" step="any" name="ra" required>
-                <label>Dec</label><input type="number" step="any" name="dec" required>
+<body class="bg-gray-900 text-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-indigo-400">Prediction History</h2>
+                <p class="text-sm text-gray-400 mt-1">Recent predictions</p>
             </div>
-            <button type="submit">Predict</button>
-        </form>
-        
-        {% if result is not none %}
-            <div class="output">
-                <h2>Prediction:</h2>
-                <p><strong>Class:</strong> {{ result }}</p>
-                <p><strong>Probability of being class 1:</strong> {{ probability | round(4) }}</p>
+            <div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-2">
+                <p class="text-gray-500 text-center mt-8">No predictions yet</p>
             </div>
-        {% endif %}
+            <div class="p-4 border-t border-gray-700">
+                <button onclick="clearHistory()" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition">
+                    Clear History
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-y-auto">
+            <div class="max-w-6xl mx-auto p-8">
+                <div class="mb-8">
+                    <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+                        Exoplanet Classification System
+                    </h1>
+                    <p class="text-gray-400 mt-2">Predict planet classification using machine learning</p>
+                </div>
+
+                <!-- Mode Selector -->
+                <div class="flex gap-4 mb-6">
+                    <button onclick="switchMode('manual')" id="manualBtn" class="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition">
+                        Manual Input
+                    </button>
+                    <button onclick="switchMode('batch')" id="batchBtn" class="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition">
+                        Batch Upload (CSV)
+                    </button>
+                </div>
+
+                <!-- Manual Input Form -->
+                <div id="manualMode" class="space-y-6">
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <h3 class="text-xl font-semibold mb-4 text-indigo-300">Orbital Parameters</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Orbital Period (days)</label>
+                                <input type="number" id="orb_period" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 365.25">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Transit Duration (hours)</label>
+                                <input type="number" id="tran_dur" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 13.0">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Transit Depth (ppm)</label>
+                                <input type="number" id="tran_depth" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 84">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Planet Radius (Earth radii)</label>
+                                <input type="number" id="planet_radius" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 1.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <h3 class="text-xl font-semibold mb-4 text-indigo-300">Planetary Characteristics</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Equilibrium Temperature (K)</label>
+                                <input type="number" id="eq_temp" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 288">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Insolation Flux (Earth flux)</label>
+                                <input type="number" id="insol_flux" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 1.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <h3 class="text-xl font-semibold mb-4 text-indigo-300">Stellar Parameters</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Stellar Teff (K)</label>
+                                <input type="number" id="stellar_teff" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 5778">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Stellar log(g)</label>
+                                <input type="number" id="stellar_logg" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 4.44">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Stellar Radius (Solar radii)</label>
+                                <input type="number" id="stellar_rad" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 1.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                        <h3 class="text-xl font-semibold mb-4 text-indigo-300">Coordinates</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Right Ascension (degrees)</label>
+                                <input type="number" id="ra" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 180.0">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Declination (degrees)</label>
+                                <input type="number" id="dec" step="any" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., 0.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="predictManual()" class="w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-lg font-semibold text-lg transition shadow-lg">
+                        Predict Classification
+                    </button>
+
+                    <div id="manualResult" class="hidden"></div>
+                </div>
+
+                <!-- Batch Upload Mode -->
+                <div id="batchMode" class="hidden space-y-6">
+                    <div class="bg-gray-800 rounded-xl p-8 shadow-xl text-center">
+                        <div class="mb-6">
+                            <svg class="w-20 h-20 mx-auto text-indigo-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <h3 class="text-xl font-semibold mb-2">Upload CSV File</h3>
+                            <p class="text-gray-400 text-sm">CSV should contain columns: orb_period, tran_dur, tran_depth, planet_radius, eq_temp, insol_flux, stellar_teff, stellar_logg, stellar_rad, ra, dec</p>
+                        </div>
+                        <input type="file" id="csvFile" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
+                        <button onclick="document.getElementById('csvFile').click()" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition">
+                            Choose CSV File
+                        </button>
+                        <p id="fileName" class="mt-4 text-gray-400 text-sm"></p>
+                    </div>
+
+                    <button onclick="predictBatch()" id="batchPredictBtn" class="w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-lg font-semibold text-lg transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Process Batch Predictions
+                    </button>
+
+                    <div id="batchResult" class="hidden"></div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script>
+        let history = [];
+        let csvData = null;
+
+        // Load history from memory
+        function loadHistory() {
+            const historyList = document.getElementById('historyList');
+            if (history.length === 0) {
+                historyList.innerHTML = '<p class="text-gray-500 text-center mt-8">No predictions yet</p>';
+                return;
+            }
+
+            historyList.innerHTML = history.map((item, index) => `
+                <div class="history-item bg-gray-700 p-3 rounded-lg cursor-pointer transition" onclick="viewHistoryItem(${index})">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-sm font-medium ${item.result === 1 ? 'text-green-400' : 'text-red-400'}">
+                            ${item.type === 'batch' ? 'Batch' : 'Manual'} Prediction
+                        </span>
+                        <span class="text-xs text-gray-400">${item.time}</span>
+                    </div>
+                    <p class="text-xs text-gray-400">
+                        ${item.type === 'batch' ? `${item.count} predictions` : `Class: ${item.result}, Prob: ${(item.probability * 100).toFixed(1)}%`}
+                    </p>
+                </div>
+            `).join('');
+        }
+
+        function switchMode(mode) {
+            const manualMode = document.getElementById('manualMode');
+            const batchMode = document.getElementById('batchMode');
+            const manualBtn = document.getElementById('manualBtn');
+            const batchBtn = document.getElementById('batchBtn');
+
+            if (mode === 'manual') {
+                manualMode.classList.remove('hidden');
+                batchMode.classList.add('hidden');
+                manualBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                manualBtn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                batchBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                batchBtn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+            } else {
+                manualMode.classList.add('hidden');
+                batchMode.classList.remove('hidden');
+                batchBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                batchBtn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                manualBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                manualBtn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+            }
+        }
+
+        async function predictManual() {
+            const fields = ['orb_period', 'tran_dur', 'tran_depth', 'planet_radius', 'eq_temp', 'insol_flux', 'stellar_teff', 'stellar_logg', 'stellar_rad', 'ra', 'dec'];
+            const data = {};
+            
+            for (const field of fields) {
+                const value = document.getElementById(field).value;
+                if (!value) {
+                    alert(`Please fill in ${field.replace('_', ' ')}`);
+                    return;
+                }
+                data[field] = parseFloat(value);
+            }
+
+            try {
+                const response = await fetch('/result', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                    return;
+                }
+
+                displayManualResult(result);
+                addToHistory({
+                    type: 'manual',
+                    result: result.result,
+                    probability: result.probability,
+                    data: data,
+                    time: new Date().toLocaleTimeString()
+                });
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function displayManualResult(result) {
+            const resultDiv = document.getElementById('manualResult');
+            const classification = result.result === 1 ? 'Confirmed Planet' : 'Not Confirmed';
+            const color = result.result === 1 ? 'green' : 'red';
+            
+            resultDiv.innerHTML = `
+                <div class="prediction-card bg-gray-800 rounded-xl p-6 shadow-xl border-2 border-${color}-500">
+                    <h3 class="text-2xl font-bold mb-4 text-${color}-400">Prediction Result</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Classification:</span>
+                            <span class="text-xl font-semibold text-${color}-400">${classification}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-300">Confidence:</span>
+                            <span class="text-xl font-semibold">${(result.probability * 100).toFixed(2)}%</span>
+                        </div>
+                        <div class="mt-4 bg-gray-700 rounded-full h-4 overflow-hidden">
+                            <div class="bg-gradient-to-r from-${color}-500 to-${color}-400 h-full transition-all duration-500" style="width: ${result.probability * 100}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').textContent = `Selected: ${file.name}`;
+            document.getElementById('batchPredictBtn').disabled = false;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSV(e.target.result);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            
+            csvData = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                const obj = {};
+                headers.forEach((header, index) => {
+                    obj[header] = parseFloat(values[index]);
+                });
+                csvData.push(obj);
+            }
+        }
+
+        async function predictBatch() {
+            if (!csvData) {
+                alert('Please select a CSV file first');
+                return;
+            }
+
+            try {
+                const response = await fetch('/batch_result', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(csvData)
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                    return;
+                }
+
+                displayBatchResult(result.results);
+                addToHistory({
+                    type: 'batch',
+                    count: result.results.length,
+                    results: result.results,
+                    time: new Date().toLocaleTimeString()
+                });
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function displayBatchResult(results) {
+            const resultDiv = document.getElementById('batchResult');
+            const confirmed = results.filter(r => r.result === 1).length;
+            
+            resultDiv.innerHTML = `
+                <div class="prediction-card bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <h3 class="text-2xl font-bold mb-4 text-indigo-400">Batch Prediction Results</h3>
+                    <div class="mb-6 p-4 bg-gray-700 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-lg">Total Predictions:</span>
+                            <span class="text-2xl font-bold">${results.length}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-lg">Confirmed Planets:</span>
+                            <span class="text-2xl font-bold text-green-400">${confirmed}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-lg">Not Confirmed:</span>
+                            <span class="text-2xl font-bold text-red-400">${results.length - confirmed}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4 flex justify-end">
+                        <button onclick="exportToCSV()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition">
+                            Export Results (CSV)
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto max-h-96 border border-gray-700 rounded-lg">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-700 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Row</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Orb Period</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Tran Dur</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Tran Depth</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Planet Radius</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Eq Temp</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Insol Flux</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Stellar Teff</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Stellar log(g)</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Stellar Rad</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">RA</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Dec</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Result</th>
+                                    <th class="px-3 py-2 text-left font-semibold border-b border-gray-600">Probability</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${results.map(r => {
+                                    const rowData = csvData[r.index];
+                                    return `
+                                    <tr class="border-b border-gray-700 hover:bg-gray-750">
+                                        <td class="px-3 py-2 font-medium">${r.index + 1}</td>
+                                        <td class="px-3 py-2">${rowData.orb_period.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.tran_dur.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.tran_depth.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.planet_radius.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.eq_temp.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.insol_flux.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.stellar_teff.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.stellar_logg.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.stellar_rad.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.ra.toFixed(2)}</td>
+                                        <td class="px-3 py-2">${rowData.dec.toFixed(2)}</td>
+                                        <td class="px-3 py-2">
+                                            <span class="px-2 py-1 rounded text-xs font-semibold ${r.result === 1 ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
+                                                ${r.result === 1 ? 'Confirmed' : 'Not Confirmed'}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 font-semibold">${(r.probability * 100).toFixed(1)}%</td>
+                                    </tr>
+                                `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+        }
+
+        function addToHistory(item) {
+            history.unshift(item);
+            if (history.length > 50) history.pop();
+            loadHistory();
+        }
+
+        function viewHistoryItem(index) {
+            const item = history[index];
+            if (item.type === 'manual') {
+                displayManualResult({ result: item.result, probability: item.probability });
+            } else {
+                displayBatchResult(item.results);
+            }
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all history?')) {
+                history = [];
+                loadHistory();
+            }
+        }
+
+        function exportToCSV() {
+            if (!csvData) return;
+            
+            const headers = ['Row', 'orb_period', 'tran_dur', 'tran_depth', 'planet_radius', 'eq_temp', 'insol_flux', 'stellar_teff', 'stellar_logg', 'stellar_rad', 'ra', 'dec', 'Result', 'Probability'];
+            
+            const rows = history[0].results.map(r => {
+                const rowData = csvData[r.index];
+                return [
+                    r.index + 1,
+                    rowData.orb_period,
+                    rowData.tran_dur,
+                    rowData.tran_depth,
+                    rowData.planet_radius,
+                    rowData.eq_temp,
+                    rowData.insol_flux,
+                    rowData.stellar_teff,
+                    rowData.stellar_logg,
+                    rowData.stellar_rad,
+                    rowData.ra,
+                    rowData.dec,
+                    r.result === 1 ? 'Confirmed' : 'Not Confirmed',
+                    r.probability
+                ].join(',');
+            });
+            
+            const csv = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `planet_predictions_${new Date().getTime()}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Initialize
+        loadHistory();
+    </script>
 </body>
 </html>
